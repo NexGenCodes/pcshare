@@ -1,6 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Upload, File, Loader2, CheckCircle2, XCircle, Moon, Sun, Monitor, HardDrive, Download, Trash2, Smartphone } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Upload, File, Loader2, CheckCircle2, XCircle, Moon, Sun, Monitor, HardDrive, Download, Smartphone } from 'lucide-react';
 import { FileItem, TransferStatus } from '../hooks/useFiles';
+import { useTheme } from '../hooks/useTheme';
 
 interface DashboardUIProps {
     files: FileItem[];
@@ -13,25 +14,7 @@ interface DashboardUIProps {
 
 export function DashboardUI({ files, uploading, progress, status, onUpload, onReset }: DashboardUIProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-    useEffect(() => {
-        // Initialize theme based on system preference or storage could happen here
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            setTheme('dark');
-            document.documentElement.classList.add('dark');
-        }
-    }, []);
-
-    const toggleTheme = () => {
-        if (theme === 'light') {
-            setTheme('dark');
-            document.documentElement.classList.add('dark');
-        } else {
-            setTheme('light');
-            document.documentElement.classList.remove('dark');
-        }
-    };
+    const { theme, toggleTheme } = useTheme();
 
     const formatSize = (bytes: number) => {
         if (bytes === 0) return '0 B';

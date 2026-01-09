@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Upload, File, Loader2, CheckCircle2, XCircle, HardDrive, Download, StopCircle, Trash2, ArrowLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Upload, File, Loader2, CheckCircle2, XCircle, HardDrive, Download, StopCircle, Trash2, ArrowLeft, ArrowUpRight, ArrowDownLeft, Settings, X, Info } from 'lucide-react';
 import { useFiles } from '../hooks/useFiles';
 import { useSession } from '../hooks/useSession';
+import { useTheme } from '../hooks/useTheme';
 import { ThemeToggle } from './ThemeToggle';
 
 interface SessionDashboardProps {
@@ -12,11 +13,13 @@ interface SessionDashboardProps {
 
 export function SessionDashboard({ sessionId, deviceName, onBack }: SessionDashboardProps) {
     const { blockSession, disconnectSession } = useSession();
+    const { theme, setTheme } = useTheme();
     // Host viewing specific session files => authenticated=true, sessionId=sessionId
     // Added isHost=true and deviceName for storage routing
     const { files, uploading, progress, status, upload } = useFiles(true, sessionId, true, deviceName);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
+    const [showSettings, setShowSettings] = useState(false);
 
     const handleDisconnect = async () => {
         if (confirm('Are you sure you want to disconnect this device?')) {
@@ -42,7 +45,7 @@ export function SessionDashboard({ sessionId, deviceName, onBack }: SessionDashb
     const filteredFiles = files.filter(f => f.direction === activeTab);
 
     return (
-        <div className="min-h-screen bg-background text-foreground flex flex-col animate-fade-in">
+        <div className="min-h-screen bg-background text-foreground flex flex-col animate-fade-in relative overflow-x-hidden">
             {/* Header */}
             <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
                 <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
@@ -59,6 +62,9 @@ export function SessionDashboard({ sessionId, deviceName, onBack }: SessionDashb
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <button onClick={() => setShowSettings(true)} className="p-2 hover:bg-surface rounded-full transition-colors opacity-60 hover:opacity-100">
+                            <Settings size={20} />
+                        </button>
                         <ThemeToggle />
                     </div>
                 </div>
@@ -191,6 +197,75 @@ export function SessionDashboard({ sessionId, deviceName, onBack }: SessionDashb
                     </div>
                 </section>
             </main>
+
+            {/* --- Session Settings Modal --- */}
+            {showSettings && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
+                    <div className="card max-w-[450px] w-full shadow-2xl border-2 border-border p-8 space-y-8 animate-slide-up">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Settings size={20} className="text-foreground/60" />
+                                <h2 className="text-xl font-black tracking-tight uppercase">Session Settings</h2>
+                            </div>
+                            <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-surface rounded-full opacity-60">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* Theme Selection */}
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Appearance</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {(['light', 'dark', 'system'] as const).map((t) => (
+                                        <button
+                                            key={t}
+                                            onClick={() => setTheme(t)}
+                                            className={`py-2 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-widest transition-all
+                                                ${theme === t
+                                                    ? 'bg-foreground text-background border-foreground'
+                                                    : 'bg-surface border-border opacity-60 hover:opacity-100 hover:border-foreground/20'}`}
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Session Details</label>
+                                <div className="bg-surface rounded-xl p-4 space-y-3 border border-border">
+                                    <div className="flex justify-between items-center text-[10px]">
+                                        <span className="opacity-50 font-bold uppercase tracking-wider">Device Name</span>
+                                        <span className="font-black">{deviceName}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[10px]">
+                                        <span className="opacity-50 font-bold uppercase tracking-wider">Session ID</span>
+                                        <span className="font-mono opacity-80">{sessionId.substring(0, 12)}...</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[10px]">
+                                        <span className="opacity-50 font-bold uppercase tracking-wider">Status</span>
+                                        <span className="text-accent-success font-black">ACTIVE</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-surface rounded-xl flex gap-3 border border-border">
+                                <Info size={16} className="opacity-40 shrink-0" />
+                                <p className="text-[10px] opacity-40 font-medium leading-relaxed">
+                                    Closing this session will permanently remove all temporary "Sent" files from the host server.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4 pt-4 border-t border-border">
+                            <button onClick={() => setShowSettings(false)} className="btn-primary flex-1 py-4 text-xs tracking-widest">
+                                DONE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -7,6 +7,7 @@ import { SessionDashboard } from './components/SessionDashboard';
 import { ThemeToggle } from './components/ThemeToggle';
 import { StopCircle, Trash2, Settings, X, HardDrive, CheckCircle2, Info, AlertTriangle, Power } from 'lucide-react';
 import { api } from './services/api';
+import { useTheme } from './hooks/useTheme';
 
 interface Toast {
     id: string;
@@ -16,6 +17,7 @@ interface Toast {
 
 function App() {
     const { sessions, mySession, isMobile, init, verify, reset, disconnectSession, blockSession } = useSession();
+    const { theme, setTheme } = useTheme();
     const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
     const [showSettings, setShowSettings] = useState(false);
     const [savePath, setSavePath] = useState('');
@@ -229,7 +231,7 @@ function App() {
 
             {/* --- Settings Modal --- */}
             {showSettings && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
                     <div className="card max-w-[500px] w-full shadow-2xl border-2 border-border p-8 space-y-8 animate-slide-up">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -242,6 +244,25 @@ function App() {
                         </div>
 
                         <div className="space-y-6">
+                            {/* Theme Selection */}
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Appearance</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {(['light', 'dark', 'system'] as const).map((t) => (
+                                        <button
+                                            key={t}
+                                            onClick={() => setTheme(t)}
+                                            className={`py-2 px-3 rounded-lg border text-[10px] font-bold uppercase tracking-widest transition-all
+                                                ${theme === t
+                                                    ? 'bg-foreground text-background border-foreground'
+                                                    : 'bg-surface border-border opacity-60 hover:opacity-100 hover:border-foreground/20'}`}
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="space-y-3">
                                 <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Download Directory</label>
                                 <div className="relative">
@@ -276,7 +297,7 @@ function App() {
             )}
 
             {/* --- Toast System --- */}
-            <div className="fixed bottom-8 right-8 z-[200] flex flex-col gap-3 max-w-sm w-full">
+            <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-3 max-w-sm w-full">
                 {toasts.map(toast => (
                     <div key={toast.id} className={`p-4 rounded-xl border-2 shadow-xl animate-slide-in flex items-center gap-4 bg-background
                         ${toast.type === 'success' ? 'border-accent-success/30 text-accent-success' :
