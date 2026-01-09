@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+cryptography
+psutil
+python-multipart
+aiofiles
+zeroconf
+qrcode[pil]
