@@ -50,7 +50,7 @@ jobs:
         working-directory: ./backend
         run: |
           pyinstaller --onefile --noconfirm --clean \
-            --add-data "dist${{ matrix.os == 'windows-latest' && ';' || ':' }}dist" \
+            --add-data "static_app${{ matrix.os == 'windows-latest' && ';' || ':' }}static_app" \
             --collect-all zeroconf \
             --hidden-import aiofiles \
             --name ${{ matrix.artifact_name }} \
