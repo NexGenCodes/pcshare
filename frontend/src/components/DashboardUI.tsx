@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Upload, Download, File, Loader2, CheckCircle2, XCircle, Smartphone, HardDrive, Share2 } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Upload, File, Loader2, CheckCircle2, XCircle, Moon, Sun, Monitor, HardDrive, Download, Trash2, Smartphone } from 'lucide-react';
 import { FileItem, TransferStatus } from '../hooks/useFiles';
 
 interface DashboardUIProps {
@@ -13,171 +13,181 @@ interface DashboardUIProps {
 
 export function DashboardUI({ files, uploading, progress, status, onUpload, onReset }: DashboardUIProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-    const formatSize = (bytes: number) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + ['Bytes', 'KB', 'MB', 'GB'][i];
+    useEffect(() => {
+        // Initialize theme based on system preference or storage could happen here
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            setTheme('dark');
+            document.documentElement.classList.add('dark');
+        }
+    }, []);
+
+    const toggleTheme = () => {
+        if (theme === 'light') {
+            setTheme('dark');
+            document.documentElement.classList.add('dark');
+        } else {
+            setTheme('light');
+            document.documentElement.classList.remove('dark');
+        }
     };
 
-    const BackgroundOrbs = () => (
-        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-            <div className="absolute top-[-15%] right-[-10%] w-[50%] h-[50%] bg-turbo-primary/10 blur-[130px] rounded-full"></div>
-            <div className="absolute bottom-[-15%] left-[-10%] w-[50%] h-[50%] bg-turbo-accent/5 blur-[130px] rounded-full"></div>
-        </div>
-    );
+    const formatSize = (bytes: number) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + ['B', 'KB', 'MB', 'GB'][i];
+    };
 
     return (
-        <div className="min-h-screen p-6 md:p-12 relative">
-            <BackgroundOrbs />
-
-            <div className="max-w-[1000px] mx-auto space-y-10 animate-fade-in">
-                {/* Header */}
-                <header className="flex flex-col md:flex-row items-center justify-between gap-6 pb-8 border-b border-white/5">
-                    <div className="text-center md:text-left">
-                        <div className="flex items-center gap-3 justify-center md:justify-start">
-                            <h1 className="text-4xl font-black text-white tracking-tight">TURBO <span className="text-turbo-primary">SYNC</span></h1>
-                            <div className="px-3 py-1 bg-turbo-primary/20 border border-turbo-primary/30 rounded-full text-[10px] uppercase font-black tracking-widest text-turbo-primary animate-pulse-slow">Live Tunnel</div>
+        <div className="min-h-screen bg-background text-foreground transition-colors duration-300 flex flex-col">
+            {/* Mobile-First Header */}
+            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+                <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-foreground text-background rounded-lg flex items-center justify-center">
+                            <Monitor size={16} strokeWidth={3} />
                         </div>
-                        <p className="text-turbo-text-muted mt-2 font-medium">Zero-latency peer-to-peer data bridge</p>
+                        <h1 className="font-extrabold tracking-tighter text-lg uppercase hidden md:block">Turbo<span className="opacity-40">Sync</span></h1>
                     </div>
 
-                    <div className="flex items-center gap-4 bg-white/5 p-2 rounded-2xl border border-white/5 shadow-inner">
-                        <div className="flex items-center gap-3 px-4 py-2">
-                            <div className="w-8 h-8 rounded-full bg-turbo-accent/20 flex items-center justify-center text-turbo-accent">
-                                <Smartphone size={16} />
-                            </div>
-                            <div className="text-left">
-                                <div className="text-xs font-bold text-white leading-tight">Mobile Linked</div>
-                                <div className="text-[10px] text-turbo-text-muted">Secure Signature: Valid</div>
-                            </div>
+                    <div className="flex items-center gap-2">
+                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border">
+                            <div className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></div>
+                            <span className="text-xs font-bold uppercase tracking-wider opacity-60">Connected</span>
                         </div>
-                        <button onClick={onReset} className="p-3 bg-white/5 hover:bg-rose-500/20 text-turbo-text-muted hover:text-rose-400 rounded-xl transition-all border border-transparent hover:border-rose-500/30">
-                            <XCircle size={20} />
+
+                        <button
+                            onClick={toggleTheme}
+                            className="p-2 rounded-lg hover:bg-surface border border-transparent hover:border-border transition-all"
+                            aria-label="Toggle Theme"
+                        >
+                            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
                         </button>
                     </div>
-                </header>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                    {/* Left: Upload and Stats */}
-                    <div className="lg:col-span-12 xl:col-span-5 space-y-8">
-                        <div className="glass-card p-1 bg-white/2">
-                            <div className="p-10 text-center space-y-6">
-                                <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && onUpload(e.target.files[0])} className="hidden" />
-
-                                <div
-                                    onClick={() => !uploading && fileInputRef.current?.click()}
-                                    className={`relative group h-[280px] rounded-[24px] border-2 border-dashed transition-all duration-500 flex flex-col items-center justify-center overflow-hidden
-                                        ${uploading
-                                            ? 'bg-black/40 border-turbo-primary/50'
-                                            : 'bg-white/3 border-white/10 cursor-pointer hover:border-turbo-primary hover:bg-turbo-primary/5'
-                                        }`}
-                                >
-                                    {uploading ? (
-                                        <div className="relative z-10 space-y-4 px-10 w-full animate-scale-in">
-                                            <div className="w-20 h-20 bg-turbo-primary/20 rounded-full flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(99,102,241,0.3)]">
-                                                <Loader2 className="animate-spin text-turbo-primary" size={40} />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <div className="text-3xl font-black text-white">{progress}%</div>
-                                                <p className="text-xs font-bold text-turbo-primary uppercase tracking-[0.2em]">Streaming Pipeline</p>
-                                            </div>
-                                            <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                                                <div className="h-full bg-turbo-primary transition-all duration-300 shadow-[0_0_15px_rgba(99,102,241,0.5)]" style={{ width: `${progress}%` }}></div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="relative z-10 space-y-4 px-6">
-                                            <div className="w-20 h-20 bg-white/5 rounded-[28px] flex items-center justify-center mx-auto border border-white/10 group-hover:scale-110 group-hover:bg-turbo-primary/10 group-hover:border-turbo-primary/30 transition-all duration-500">
-                                                <Upload size={36} className="text-turbo-text-muted group-hover:text-turbo-primary transition-colors" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <h3 className="text-xl font-bold text-white">Drop to Synchronize</h3>
-                                                <p className="text-sm text-turbo-text-muted">Instant zero-copy local bus</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {status && (
-                                    <div className={`flex items-center gap-3 p-4 rounded-2xl border animate-scale-in text-sm font-medium ${status.type === 'success'
-                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                        : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                                        }`}>
-                                        {status.type === 'success' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                                        {status.message}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right: File List */}
-                    <div className="lg:col-span-12 xl:col-span-7">
-                        <div className="glass-card bg-white/2 border border-white/5 overflow-hidden flex flex-col h-full ring-1 ring-white/5">
-                            <div className="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-white/2">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-turbo-accent/10 rounded-lg text-turbo-accent">
-                                        <HardDrive size={20} />
-                                    </div>
-                                    <h2 className="text-lg font-black text-white uppercase tracking-wider">Active Vault</h2>
-                                </div>
-                                <div className="px-3 py-1 bg-white/5 rounded-lg text-[10px] font-bold text-turbo-text-muted uppercase tracking-widest">{files.length} ITEMS</div>
-                            </div>
-
-                            <div className="grow overflow-y-auto max-h-[600px] scrollbar-hide divide-y divide-white/3">
-                                {files.length === 0 ? (
-                                    <div className="py-32 text-center space-y-4 opacity-30 px-10">
-                                        <div className="w-20 h-20 border-2 border-dashed border-white/20 rounded-full flex items-center justify-center mx-auto">
-                                            <Share2 size={32} />
-                                        </div>
-                                        <p className="text-sm font-medium tracking-wide">No active transfers in this session.</p>
-                                    </div>
-                                ) : (
-                                    files.map((file) => (
-                                        <div key={file.name} className="px-8 py-5 flex items-center justify-between group hover:bg-white/3 transition-all">
-                                            <div className="flex items-center gap-5">
-                                                <div className="relative">
-                                                    <div className="absolute inset-0 bg-turbo-primary/20 blur opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                                    <div className="relative bg-turbo-surface-light p-3.5 rounded-2xl text-turbo-primary border border-white/5 group-hover:border-turbo-primary/30 transition-all">
-                                                        <File size={22} />
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <div className="font-bold text-white group-hover:text-turbo-primary transition-colors truncate max-w-[200px] md:max-w-md">{file.name}</div>
-                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-turbo-text-muted uppercase tracking-wider">
-                                                        <span>{formatSize(file.size)}</span>
-                                                        <span className="w-1 h-1 bg-white/10 rounded-full"></span>
-                                                        <span>{new Date(file.modified * 1000).toLocaleTimeString()}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <a
-                                                href={`/api/files/download/${encodeURIComponent(file.name)}`}
-                                                download
-                                                className="p-3 bg-white/5 hover:bg-turbo-primary text-turbo-text-muted hover:text-white rounded-xl transition-all border border-transparent hover:ring-4 hover:ring-turbo-primary/20 shadow-lg"
-                                            >
-                                                <Download size={20} />
-                                            </a>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
                 </div>
+            </header>
 
-                {/* Footer Detail */}
-                <footer className="pt-10 flex items-center justify-between text-[10px] font-mono text-turbo-text-muted/30 uppercase tracking-[0.3em]">
-                    <div>Cyber-Safe Protocol Active</div>
-                    <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-2 underline decoration-turbo-primary/30">AES-256 E2EE</span>
-                        <span className="w-1 h-1 bg-white/10 rounded-full"></span>
-                        <span className="text-white/20">TurbSync Engine v4.0</span>
+            <main className="grow p-4 md:p-8 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                {/* Status & Upload Section */}
+                <section className="lg:col-span-4 space-y-6">
+                    {/* Status Card */}
+                    <div className="card space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-bold uppercase tracking-widest opacity-50">Session</h2>
+                            <button onClick={onReset} className="text-xs font-bold underline hover:no-underline opacity-60 hover:opacity-100 hover:text-accent-error">DISCONNECT</button>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-surface border border-border flex items-center justify-center">
+                                <Smartphone size={24} strokeWidth={1.5} />
+                            </div>
+                            <div>
+                                <div className="font-bold text-lg">Mobile Linked</div>
+                                <div className="text-xs opacity-50 font-mono">ID: {Math.random().toString(36).substr(2, 6).toUpperCase()}</div>
+                            </div>
+                        </div>
                     </div>
-                </footer>
-            </div>
+
+                    {/* Upload Card */}
+                    <div className="card aspect-square flex flex-col relative overflow-hidden group">
+                        <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && onUpload(e.target.files[0])} className="hidden" />
+
+                        <div
+                            onClick={() => !uploading && fileInputRef.current?.click()}
+                            className={`grow border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-4 transition-all cursor-pointer hover:bg-surface hover:border-foreground/20
+                            ${uploading ? 'bg-surface border-transparent pointer-events-none' : ''}`}
+                        >
+                            {uploading ? (
+                                <div className="text-center w-full px-8 animate-fade-in">
+                                    <div className="mb-4 relative w-16 h-16 mx-auto flex items-center justify-center">
+                                        <Loader2 size={32} className="animate-spin text-accent-success" />
+                                    </div>
+                                    <div className="font-mono text-3xl font-bold mb-1">{progress}%</div>
+                                    <div className="h-1 w-full bg-border rounded-full overflow-hidden">
+                                        <div className="h-full bg-foreground transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                                    </div>
+                                    <p className="text-xs uppercase tracking-widest mt-4 opacity-50 font-bold">Transferring...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="w-16 h-16 bg-foreground text-background rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                                        <Upload size={32} strokeWidth={2} />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="font-bold text-lg">Send Files</p>
+                                        <p className="text-xs opacity-50 mt-1 font-medium">Tap to browse or drop files</p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {status && (
+                            <div className={`mt-4 p-3 rounded-lg border flex items-center gap-3 text-sm font-bold
+                                ${status.type === 'success'
+                                    ? 'bg-accent-success/10 border-accent-success/20 text-accent-success'
+                                    : 'bg-accent-error/10 border-accent-error/20 text-accent-error'}`}>
+                                {status.type === 'success' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                                {status.message}
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* File List Section */}
+                <section className="lg:col-span-8 flex flex-col h-full min-h-[500px]">
+                    <div className="card h-full flex flex-col p-0 overflow-hidden">
+                        <div className="p-6 border-b border-border flex items-center justify-between bg-surface/50">
+                            <div className="flex items-center gap-3">
+                                <HardDrive size={20} className="text-foreground" />
+                                <h2 className="font-bold text-lg tracking-tight">Shared Files</h2>
+                            </div>
+                            <span className="px-2 py-1 bg-background border border-border rounded text-xs font-bold font-mono opacity-60">{files.length} ITEMS</span>
+                        </div>
+
+                        <div className="grow overflow-y-auto p-4 space-y-3">
+                            {files.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center opacity-30 space-y-4">
+                                    <File size={48} strokeWidth={1} />
+                                    <p className="font-bold uppercase tracking-widest text-sm">Vault Empty</p>
+                                </div>
+                            ) : (
+                                files.map((file) => (
+                                    <div key={file.name} className="group p-4 rounded-lg border border-border hover:bg-surface transition-all flex items-center justify-between">
+                                        <div className="flex items-center gap-4 overflow-hidden">
+                                            <div className="w-10 h-10 bg-surface border border-border rounded-lg flex items-center justify-center text-foreground/70 font-bold text-[10px] uppercase shrink-0">
+                                                {file.name.split('.').pop()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <div className="font-bold truncate text-sm">{file.name}</div>
+                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter shrink-0
+                                                        ${file.direction === 'sent' ? 'bg-accent-success/10 text-accent-success border border-accent-success/20' : 'bg-foreground/5 opacity-40 border border-border'}`}>
+                                                        {file.direction === 'sent' ? 'From Host' : 'Sent'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs opacity-40 font-mono">
+                                                    <span>{formatSize(file.size)}</span>
+                                                    <span>•</span>
+                                                    <span>{new Date(file.modified * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <a href={`/api/files/download/${encodeURIComponent(file.name)}`} download>
+                                            <button className="p-2 bg-surface hover:bg-background border border-border rounded-lg transition-all text-foreground/60 hover:text-foreground shrink-0">
+                                                <Download size={18} />
+                                            </button>
+                                        </a>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </section>
+            </main>
         </div>
     );
 }

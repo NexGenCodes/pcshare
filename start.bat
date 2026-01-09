@@ -29,15 +29,18 @@ if not exist node_modules (
 set VITE_DEV=true
 echo [3/3] Launching Turbo Sync...
 
-echo [INFO] Starting Secure Backend...
-start "Turbo Backend" /min cmd /c "cd ../backend && python main.py"
+echo [INFO] Starting Backend in background...
+cd ..\backend
+start /b python main.py
 
-echo [INFO] Starting Vite HMR Server...
-echo [TIP]  App will open automatically. Press Ctrl+C in THIS window to stop everything.
+echo [INFO] Starting Frontend Dev Server...
+cd ..\frontend
+echo [TIP]  Press Ctrl+C to stop both services.
 call npm run dev -- --open
 
 :: Cleanup on exit
-echo [CLEANUP] Stopping services...
-taskkill /F /IM python.exe /FI "WINDOWTITLE eq Turbo Backend*" >nul 2>&1
+echo.
+echo [CLEANUP] Stopping all services...
+taskkill /F /IM python.exe >nul 2>&1
 echo Done.
 exit

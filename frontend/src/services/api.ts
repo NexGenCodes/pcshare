@@ -1,34 +1,41 @@
 import { API_BASE } from '../constants/constants';
 
 export interface ApiClient {
-    get<T>(endpoint: string): Promise<T>;
-    post<T>(endpoint: string, body: any): Promise<T>;
-    upload<T>(endpoint: string, file: File, onProgress?: (p: number) => void): Promise<T>;
+    get<T>(endpoint: string, headers?: Record<string, string>): Promise<T>;
+    post<T>(endpoint: string, body: any, headers?: Record<string, string>): Promise<T>;
+    upload<T>(endpoint: string, file: File, onProgress?: (p: number) => void, headers?: Record<string, string>): Promise<T>;
 }
 
 export const api: ApiClient = {
-    async get<T>(endpoint: string): Promise<T> {
-        const response = await fetch(`${API_BASE}${endpoint}`);
+    async get<T>(endpoint: string, headers: Record<string, string> = {}): Promise<T> {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            headers: headers
+        });
         if (!response.ok) throw new Error('API Error');
         return response.json() as Promise<T>;
     },
 
-    async post<T>(endpoint: string, body: any): Promise<T> {
+    async post<T>(endpoint: string, body: any, headers: Record<string, string> = {}): Promise<T> {
+        const finalHeaders = { 'Content-Type': 'application/json', ...headers };
         const response = await fetch(`${API_BASE}${endpoint}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: finalHeaders,
             body: JSON.stringify(body),
         });
         if (!response.ok) throw new Error('API Error');
         return response.json() as Promise<T>;
     },
 
-    upload<T>(endpoint: string, file: File, onProgress?: (p: number) => void): Promise<T> {
+    upload<T>(endpoint: string, file: File, onProgress?: (p: number) => void, headers: Record<string, string> = {}): Promise<T> {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', `${API_BASE}${endpoint}`, true);
             xhr.setRequestHeader('x-filename', file.name);
             xhr.setRequestHeader('x-filesize', file.size.toString());
+
+            Object.keys(headers).forEach(key => {
+                xhr.setRequestHeader(key, headers[key]);
+            });
 
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable && onProgress) {

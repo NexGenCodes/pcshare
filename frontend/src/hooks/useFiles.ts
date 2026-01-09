@@ -6,6 +6,8 @@ export interface FileItem {
     name: string;
     size: number;
     modified: number;
+    direction?: 'sent' | 'received';
+    session_id?: string;
 }
 
 export interface TransferStatus {
@@ -13,17 +15,27 @@ export interface TransferStatus {
     message: string;
 }
 
-export function useFiles(isAuthenticated: boolean) {
+export function useFiles(isAuthenticated: boolean, sessionId?: string | null, isHost: boolean = false, deviceName?: string) {
     const [files, setFiles] = useState<FileItem[]>([]);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [status, setStatus] = useState<TransferStatus | null>(null);
 
+    const getHeaders = (): Record<string, string> => {
+        const h: Record<string, string> = {};
+        if (sessionId) h['x-session-id'] = sessionId;
+        if (isHost) h['x-is-host'] = 'true';
+        if (deviceName) h['x-device-name'] = deviceName;
+        return h;
+    };
+
     const fetchFiles = async () => {
         try {
-            const data = await api.get<FileItem[]>('/files/');
+            const data = await api.get<FileItem[]>('/files/', getHeaders());
             setFiles(data);
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error('Fetch error:', e);
+        }
     };
 
     useEffect(() => {
@@ -32,7 +44,7 @@ export function useFiles(isAuthenticated: boolean) {
             const interval = setInterval(fetchFiles, POLL_INTERVAL_FILES);
             return () => clearInterval(interval);
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, sessionId, deviceName, isHost]);
 
     const upload = async (file: File) => {
         setUploading(true);
@@ -40,7 +52,7 @@ export function useFiles(isAuthenticated: boolean) {
         setStatus(null);
 
         try {
-            await api.upload<any>('/files/upload', file, setProgress);
+            await api.upload<any>('/files/upload', file, setProgress, getHeaders());
             setStatus({ type: 'success', message: `Successfully transferred ${file.name}` });
             fetchFiles();
         } catch (e) {
