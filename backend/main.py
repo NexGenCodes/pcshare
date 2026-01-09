@@ -7,11 +7,11 @@ import aiofiles
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from .ssl_gen import generate_self_signed_cert
-from .qr_gen import generate_qr_code_buffer, get_primary_ip
-from .mdns_gen import start_mdns, stop_mdns
+from ssl_gen import generate_self_signed_cert
+from qr_gen import generate_qr_code_buffer, get_primary_ip
+from mdns_gen import start_mdns, stop_mdns
 
-app = FastAPI(title="TurboTransfer")
+from contextlib import asynccontextmanager
 
 # Constants
 CHUNK_SIZE = 1024 * 1024  # 1MB buffer
@@ -28,18 +28,23 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 mdns_service = None
 
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     global mdns_service
-    mdns_service = start_mdns(8000)
+    mdns_service = await start_mdns(8000)
     # Background watchdog loop
-    asyncio.create_task(watchdog_loop())
+    watchdog_task = asyncio.create_task(watchdog_loop())
+
+    yield
+
+    # Shutdown
+    if mdns_service and mdns_service[0]:
+        await stop_mdns(*mdns_service)
+    watchdog_task.cancel()
 
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    if mdns_service:
-        stop_mdns(*mdns_service)
+app = FastAPI(title="TurboTransfer", lifespan=lifespan)
 
 
 async def watchdog_loop():

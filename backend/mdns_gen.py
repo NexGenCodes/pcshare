@@ -1,12 +1,13 @@
 import socket
-from zeroconf import IPVersion, ServiceInfo, Zeroconf
+import asyncio
+from zeroconf.asyncio import AsyncZeroconf
+from zeroconf import ServiceInfo
 
 
-def start_mdns(port=8000):
+async def start_mdns(port=8000):
     desc = {"path": "/"}
 
     hostname = socket.gethostname()
-    local_ip = socket.gethostbyname(hostname)
 
     # Try to get the IP used for outgoing connections
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -14,7 +15,7 @@ def start_mdns(port=8000):
         s.connect(("10.255.255.255", 1))
         local_ip = s.getsockname()[0]
     except Exception:
-        pass
+        local_ip = socket.gethostbyname(hostname)
     finally:
         s.close()
 
@@ -27,12 +28,20 @@ def start_mdns(port=8000):
         server=f"{hostname}.local.",
     )
 
-    zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
-    zeroconf.register_service(info)
-    print(f"mDNS: Registered as {hostname}.local (transfer.local)")
-    return zeroconf, info
+    try:
+        aio_zeroconf = AsyncZeroconf()
+        await aio_zeroconf.async_register_service(info)
+        print(f"mDNS: Registered as {hostname}.local (transfer.local) at {local_ip}")
+        return aio_zeroconf, info
+    except Exception as e:
+        print(f"mDNS Error: Could not register service: {e}")
+        return None, None
 
 
-def stop_mdns(zeroconf, info):
-    zeroconf.unregister_service(info)
-    zeroconf.close()
+async def stop_mdns(aio_zeroconf, info):
+    if aio_zeroconf and info:
+        try:
+            await aio_zeroconf.async_unregister_service(info)
+            await aio_zeroconf.async_close()
+        except Exception as e:
+            print(f"mDNS Shutdown Error: {e}")
