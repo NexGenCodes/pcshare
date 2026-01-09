@@ -1,13 +1,50 @@
-from mdns_gen import start_mdns, stop_mdns
+import socket
+import asyncio
+from zeroconf.asyncio import AsyncZeroconf
+from zeroconf import ServiceInfo
+import logging
 
 
 class MDNSService:
-    def __init__(self):
-        self.mdns_data = None
+    _aio_zeroconf = None
+    _info = None
 
-    async def start(self, port: int):
-        self.mdns_data = await start_mdns(port)
+    @classmethod
+    async def start(cls, port: int = 8000):
+        try:
+            cls._aio_zeroconf = AsyncZeroconf()
+            hostname = socket.gethostname()
 
-    async def stop(self):
-        if self.mdns_data and self.mdns_data[0]:
-            await stop_mdns(*self.mdns_data)
+            # Robust IP discovery
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(("10.255.255.255", 1))
+                local_ip = s.getsockname()[0]
+            except Exception:
+                local_ip = socket.gethostbyname(hostname)
+            finally:
+                s.close()
+
+            cls._info = ServiceInfo(
+                "_http._tcp.local.",
+                f"TurboSync Host ({hostname})._http._tcp.local.",
+                addresses=[socket.inet_aton(local_ip)],
+                port=port,
+                properties={"path": "/"},
+                server=f"{hostname}.local.",
+            )
+
+            await cls._aio_zeroconf.async_register_service(cls._info)
+            logging.info(f"mDNS Service started: {hostname}.local (IP: {local_ip})")
+        except Exception as e:
+            logging.error(f"Failed to start mDNS service: {e}")
+
+    @classmethod
+    async def stop(cls):
+        if cls._aio_zeroconf and cls._info:
+            try:
+                await cls._aio_zeroconf.async_unregister_service(cls._info)
+                await cls._aio_zeroconf.async_close()
+                logging.info("mDNS Service stopped")
+            except Exception as e:
+                logging.error(f"mDNS Shutdown Error: {e}")

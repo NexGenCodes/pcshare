@@ -8,6 +8,8 @@ export interface FileItem {
     modified: number;
     direction?: 'sent' | 'received';
     session_id?: string;
+    is_dir?: boolean;
+    has_thumbnail?: boolean;
 }
 
 export interface TransferStatus {

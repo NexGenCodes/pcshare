@@ -12,6 +12,8 @@ class FileService:
     # Default save path is user's Downloads folder
     SAVE_PATH = os.path.join(os.path.expanduser("~"), "Downloads", "TurboSync")
     CHUNK_SIZE = 64 * 1024  # 64KB chunks for optimized transfer speed
+    BLOCK_EXTENSIONS = [".exe", ".bat", ".cmd", ".msi", ".sh", ".vbs", ".scr"]
+    SAFETY_FILTER_ENABLED = True
 
     @classmethod
     def set_save_path(cls, path: str):
@@ -30,11 +32,21 @@ class FileService:
         return filename
 
     @classmethod
+    def is_safe(cls, filename: str) -> bool:
+        if not cls.SAFETY_FILTER_ENABLED:
+            return True
+        ext = os.path.splitext(filename)[1].lower()
+        return ext not in cls.BLOCK_EXTENSIONS
+
+    @classmethod
     async def save_stream(cls, request, session_id: str = None, is_host: bool = False):
         filename = cls.sanitize_filename(
             request.headers.get("x-filename", "unnamed_file")
         )
         expected_size = int(request.headers.get("x-filesize", 0))
+
+        if not cls.is_safe(filename):
+            raise HTTPException(status_code=403, detail="File type blocked for security")
 
         if is_host:
             # Host uploads to a device (OUTGOING)
@@ -43,10 +55,9 @@ class FileService:
                     status_code=400, detail="Session ID required for host uploads"
                 )
             target_dir = os.path.join(UPLOAD_DIR, session_id, "outgoing")
+            device_name = "Host"
         else:
             # Client uploads to host (INCOMING)
-            # We save directly to the configured SAVE_PATH
-            # To keep it organized, use device_name/session_id if possible
             device_name = request.headers.get("x-device-name", "Unknown_Device")
             device_name = cls.sanitize_filename(device_name)
             target_dir = os.path.join(cls.SAVE_PATH, device_name)
@@ -57,6 +68,8 @@ class FileService:
         temp_path = os.path.join(target_dir, f"{file_id}.tmp")
 
         import aiofiles
+        from services.analytics_service import AnalyticsService
+        from services.thumbnail_service import ThumbnailService
 
         try:
             async with aiofiles.open(temp_path, "wb") as f:
@@ -77,6 +90,14 @@ class FileService:
                 final_path = os.path.join(target_dir, f"{name}_{file_id[:8]}{ext}")
 
             shutil.move(temp_path, final_path)
+            
+            # Analytics & Thumbnails
+            direction = "sent" if is_host else "received"
+            AnalyticsService.log_transfer(device_name, filename, actual_size, direction)
+            
+            # Generate thumbnail if image
+            ThumbnailService.generate_thumbnail(final_path)
+            
             return os.path.basename(final_path)
 
         except Exception as e:
@@ -96,19 +117,27 @@ class FileService:
         """
         files = []
 
-        def scan(directory, direction, session_tag):
+            from services.thumbnail_service import ThumbnailService
             if not os.path.exists(directory):
                 return
             for f in os.listdir(directory):
                 path = os.path.join(directory, f)
-                if os.path.isfile(path) and not f.endswith(".tmp"):
+                is_dir = os.path.isdir(path)
+                if (os.path.isfile(path) or is_dir) and not f.endswith(".tmp") and not f.startswith("."):
+                    has_thumb = False
+                    if not is_dir:
+                        thumb_path = ThumbnailService.get_thumbnail_path(path)
+                        has_thumb = os.path.exists(thumb_path)
+
                     files.append(
                         {
                             "name": f,
-                            "size": os.path.getsize(path),
+                            "size": os.path.getsize(path) if not is_dir else 0,
                             "modified": os.path.getmtime(path),
-                            "direction": direction,  # 'incoming' or 'outgoing'
+                            "direction": direction,
                             "session_id": session_tag,
+                            "is_dir": is_dir,
+                            "has_thumbnail": has_thumb
                         }
                     )
 
@@ -174,3 +203,16 @@ class FileService:
             except Exception as e:
                 print(f"Watchdog Error: {e}")
             await asyncio.sleep(10)
+
+    @classmethod
+    async def zip_directory(cls, directory_path: str) -> str:
+        """Zips a directory and returns the path to the zip file. Zip is saved in a temp location."""
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        base_name = os.path.basename(directory_path)
+        zip_path = os.path.join(temp_dir, f"{base_name}_{uuid.uuid4().hex}")
+        
+        # Run shutil.make_archive in a thread to keep FastAPI alive
+        loop = asyncio.get_event_loop()
+        final_zip = await loop.run_in_executor(None, lambda: shutil.make_archive(zip_path, 'zip', directory_path))
+        return final_zip

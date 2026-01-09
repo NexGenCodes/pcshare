@@ -5,9 +5,24 @@ import { HandshakeUI } from './components/HandshakeUI';
 import { DashboardUI } from './components/DashboardUI';
 import { SessionDashboard } from './components/SessionDashboard';
 import { ThemeToggle } from './components/ThemeToggle';
-import { StopCircle, Trash2, Settings, X, HardDrive, CheckCircle2, Info, AlertTriangle, Power } from 'lucide-react';
+import { StopCircle, Trash2, Settings, X, HardDrive, CheckCircle2, Info, AlertTriangle, Power, BarChart3, ShieldCheck, Monitor, Smartphone, Activity } from 'lucide-react';
 import { api } from './services/api';
 import { useTheme } from './hooks/useTheme';
+
+interface AnalyticsEntry {
+    timestamp: number;
+    device: string;
+    filename: string;
+    size: number;
+    direction: 'sent' | 'received';
+    status: string;
+}
+
+interface AnalyticsStats {
+    total_sent: number;
+    total_received: number;
+    count: number;
+}
 
 interface Toast {
     id: string;
@@ -20,8 +35,14 @@ function App() {
     const { theme, setTheme } = useTheme();
     const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
     const [showSettings, setShowSettings] = useState(false);
+    const [activeHostTab, setActiveHostTab] = useState<'devices' | 'analytics'>('devices');
     const [savePath, setSavePath] = useState('');
+    const [safetyFilter, setSafetyFilter] = useState(true);
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [analytics, setAnalytics] = useState<{ history: AnalyticsEntry[], stats: AnalyticsStats }>({
+        history: [],
+        stats: { total_sent: 0, total_received: 0, count: 0 }
+    });
 
     const lastSessionCount = useRef(sessions.length);
 
@@ -34,22 +55,39 @@ function App() {
         }, 4000);
     };
 
-    // --- Settings Logic ---
+    // --- Settings & Analytics Logic ---
     useEffect(() => {
         if (!isMobile) {
-            api.get<{ save_path: string }>('/files/config')
-                .then(data => setSavePath(data.save_path))
+            api.get<{ save_path: string, safety_filter: boolean }>('/files/config')
+                .then(data => {
+                    setSavePath(data.save_path);
+                    setSafetyFilter(data.safety_filter);
+                })
                 .catch(console.error);
+
+            fetchAnalytics();
         }
     }, [isMobile]);
 
-    const updateSavePath = async () => {
+    const fetchAnalytics = async () => {
         try {
-            await api.post('/files/config', { save_path: savePath });
-            showToast('Save path updated successfully', 'success');
+            const data = await api.get<{ history: AnalyticsEntry[], stats: AnalyticsStats }>('/files/analytics/history');
+            setAnalytics(data);
+        } catch (e) {
+            console.error('Analytics fetch failed', e);
+        }
+    };
+
+    const updateConfig = async () => {
+        try {
+            await api.post('/files/config', {
+                save_path: savePath,
+                safety_filter: safetyFilter
+            });
+            showToast('Configuration updated', 'success');
             setShowSettings(false);
         } catch (e) {
-            showToast('Failed to update save path', 'error');
+            showToast('Failed to update config', 'error');
         }
     };
 
@@ -126,9 +164,9 @@ function App() {
             <header className="w-full max-w-7xl flex justify-between items-center border-b border-border pb-4">
                 <div className="flex items-center gap-4">
                     <h1 className="text-2xl font-black tracking-tighter">TURBO<span className="opacity-40">SYNC</span> HOST</h1>
-                    <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-surface rounded-full border border-border">
+                    <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-surface rounded-full border border-border">
                         <div className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Server Active</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">turbosync.local</span>
                     </div>
                 </div>
                 <div className="flex gap-4 items-center">
@@ -143,90 +181,182 @@ function App() {
                 </div>
             </header>
 
-            <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* LEFT: Connect New Device */}
-                <div className="space-y-6">
-                    <div className="card bg-surface/50 border-dashed border-2 relative overflow-hidden flex flex-col items-center justify-center min-h-[500px]">
-                        <HandshakeUI
-                            session={{ status: 'IDLE', pin: null }}
-                            isMobile={false}
-                            onInit={() => { }}
-                            onVerify={async () => false}
-                        />
-                    </div>
+            <main className="w-full max-w-7xl">
+                {/* Tab Switcher */}
+                <div className="flex gap-1 bg-surface p-1 rounded-xl w-fit mb-8 border border-border">
+                    <button
+                        onClick={() => setActiveHostTab('devices')}
+                        className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2
+                        ${activeHostTab === 'devices' ? 'bg-background shadow-lg' : 'opacity-40 hover:opacity-100'}`}
+                    >
+                        <Smartphone size={14} />
+                        Active Devices
+                    </button>
+                    <button
+                        onClick={() => { setActiveHostTab('analytics'); fetchAnalytics(); }}
+                        className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2
+                        ${activeHostTab === 'analytics' ? 'bg-background shadow-lg' : 'opacity-40 hover:opacity-100'}`}
+                    >
+                        <BarChart3 size={14} />
+                        Analytics
+                    </button>
                 </div>
 
-                {/* RIGHT: Active Sessions List */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold uppercase tracking-widest opacity-60">Connected Devices</h2>
-                        <span className="px-2 py-1 bg-surface border border-border rounded text-[10px] font-black">{sessions.length} ACTIVE</span>
-                    </div>
-
-                    {sessions.length === 0 && (
-                        <div className="p-20 text-center opacity-30 border border-dashed border-border rounded-3xl flex flex-col items-center gap-4">
-                            <HardDrive size={48} strokeWidth={1} />
-                            <div>
-                                <p className="font-bold uppercase tracking-widest text-sm">Waiting for connections</p>
-                                <p className="text-[10px] mt-1 font-medium">Scan the QR code to pair a device</p>
+                {activeHostTab === 'devices' ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                        {/* LEFT: Connect New Device */}
+                        <div className="space-y-6">
+                            <div className="card bg-surface/50 border-dashed border-2 relative overflow-hidden flex flex-col items-center justify-center min-h-[500px]">
+                                <HandshakeUI
+                                    session={{ status: 'IDLE', pin: null }}
+                                    isMobile={false}
+                                    onInit={() => { }}
+                                    onVerify={async () => false}
+                                />
                             </div>
                         </div>
-                    )}
 
-                    <div className="grid gap-4">
-                        {sessions.map(s => (
-                            <div key={s.session_id} className="card flex items-center justify-between p-6 animate-fade-in group hover:border-foreground/20 transition-all border-l-4"
-                                style={{ borderLeftColor: s.status === 'AUTHENTICATED' ? 'var(--accent-success)' : 'var(--accent-warning)' }}>
-                                <div>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <span className="font-bold text-lg">{s.device_name || 'Unknown Device'}</span>
-                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider 
-                                            ${s.status === 'AUTHENTICATED' ? 'bg-accent-success/10 text-accent-success' : 'bg-accent-warning/10 text-accent-warning'}`}>
-                                            {s.status === 'AUTHENTICATED' ? 'Linked' : 'Pairing'}
-                                        </span>
+                        {/* RIGHT: Active Sessions List */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-xl font-bold uppercase tracking-widest opacity-60">Connected Devices</h2>
+                                <span className="px-2 py-1 bg-surface border border-border rounded text-[10px] font-black">{sessions.length} ACTIVE</span>
+                            </div>
+
+                            {sessions.length === 0 && (
+                                <div className="p-20 text-center opacity-30 border border-dashed border-border rounded-3xl flex flex-col items-center gap-4">
+                                    <HardDrive size={48} strokeWidth={1} />
+                                    <div>
+                                        <p className="font-bold uppercase tracking-widest text-sm">Waiting for connections</p>
+                                        <p className="text-[10px] mt-1 font-medium">Scan the QR code to pair a device</p>
                                     </div>
-                                    <div className="text-[10px] font-mono opacity-40 uppercase tracking-widest">{s.session_id?.substring(0, 8)}...</div>
-
-                                    {s.status === 'PENDING_VERIFICATION' && (
-                                        <div className="mt-4 bg-background border border-border text-foreground font-black text-4xl p-4 rounded-xl tracking-[0.2em] inline-block shadow-inner">
-                                            {s.pin}
-                                        </div>
-                                    )}
                                 </div>
+                            )}
 
-                                <div className="flex items-center gap-2">
-                                    {s.status === 'AUTHENTICATED' && (
-                                        <>
-                                            <button
-                                                onClick={() => setViewingSessionId(s.session_id || null)}
-                                                className="btn-primary text-[10px] px-6 py-2 tracking-widest shadow-lg"
-                                            >
-                                                MANAGE
-                                            </button>
-                                            <div className="w-px h-6 bg-border mx-2"></div>
-                                        </>
-                                    )}
-                                    <div className="flex gap-1">
-                                        <button
-                                            onClick={() => { if (confirm('Disconnect device?')) disconnectSession(s.session_id!) }}
-                                            className="p-2 text-foreground/40 hover:text-accent-warning hover:bg-surface rounded-lg transition-colors"
-                                            title="Disconnect"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => { if (confirm('BLOCK device permanently?')) blockSession(s.session_id!) }}
-                                            className="p-2 text-foreground/40 hover:text-accent-error hover:bg-surface rounded-lg transition-colors"
-                                            title="Block"
-                                        >
-                                            <StopCircle size={16} />
-                                        </button>
+                            <div className="grid gap-4">
+                                {sessions.map(s => (
+                                    <div key={s.session_id} className="card flex items-center justify-between p-6 animate-fade-in group hover:border-foreground/20 transition-all border-l-4"
+                                        style={{ borderLeftColor: s.status === 'AUTHENTICATED' ? 'var(--accent-success)' : 'var(--accent-warning)' }}>
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="font-bold text-lg">{s.device_name || 'Unknown Device'}</span>
+                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider 
+                                            ${s.status === 'AUTHENTICATED' ? 'bg-accent-success/10 text-accent-success' : 'bg-accent-warning/10 text-accent-warning'}`}>
+                                                    {s.status === 'AUTHENTICATED' ? 'Linked' : 'Pairing'}
+                                                </span>
+                                            </div>
+                                            <div className="text-[10px] font-mono opacity-40 uppercase tracking-widest">{s.session_id?.substring(0, 8)}...</div>
+
+                                            {s.status === 'PENDING_VERIFICATION' && (
+                                                <div className="mt-4 bg-background border border-border text-foreground font-black text-4xl p-4 rounded-xl tracking-[0.2em] inline-block shadow-inner">
+                                                    {s.pin}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            {s.status === 'AUTHENTICATED' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => setViewingSessionId(s.session_id || null)}
+                                                        className="btn-primary text-[10px] px-6 py-2 tracking-widest shadow-lg"
+                                                    >
+                                                        MANAGE
+                                                    </button>
+                                                    <div className="w-px h-6 bg-border mx-2"></div>
+                                                </>
+                                            )}
+                                            <div className="flex gap-1">
+                                                <button
+                                                    onClick={() => { if (confirm('Disconnect device?')) disconnectSession(s.session_id!) }}
+                                                    className="p-2 text-foreground/40 hover:text-accent-warning hover:bg-surface rounded-lg transition-colors"
+                                                    title="Disconnect"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => { if (confirm('BLOCK device permanently?')) blockSession(s.session_id!) }}
+                                                    className="p-2 text-foreground/40 hover:text-accent-error hover:bg-surface rounded-lg transition-colors"
+                                                    title="Block"
+                                                >
+                                                    <StopCircle size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    /* ANALYTICS VIEW */
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
+                        {/* Stats Summary */}
+                        <div className="lg:col-span-4 space-y-6">
+                            <div className="card space-y-4">
+                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Total Bandwidth</h3>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-end">
+                                        <div className="text-3xl font-black">{(analytics.stats.total_received / (1024 * 1024)).toFixed(1)}<span className="text-xs ml-1 opacity-30 uppercase">MB</span></div>
+                                        <div className="text-[10px] font-bold bg-accent-success/10 text-accent-success px-2 py-1 rounded">RECEIVED</div>
+                                    </div>
+                                    <div className="h-1 bg-surface rounded-full overflow-hidden">
+                                        <div className="h-full bg-accent-success/40" style={{ width: '65%' }}></div>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <div className="text-3xl font-black">{(analytics.stats.total_sent / (1024 * 1024)).toFixed(1)}<span className="text-xs ml-1 opacity-30 uppercase">MB</span></div>
+                                        <div className="text-[10px] font-bold bg-foreground/10 px-2 py-1 rounded">SENT</div>
+                                    </div>
+                                    <div className="h-1 bg-surface rounded-full overflow-hidden">
+                                        <div className="h-full bg-foreground/10" style={{ width: '35%' }}></div>
                                     </div>
                                 </div>
                             </div>
-                        ))}
+
+                            <div className="card space-y-2">
+                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Transfer Count</h3>
+                                <div className="text-4xl font-black">{analytics.stats.count}</div>
+                                <p className="text-[10px] opacity-40 font-medium">Recorded transfers in current history buffer</p>
+                            </div>
+                        </div>
+
+                        {/* History Log */}
+                        <div className="lg:col-span-8">
+                            <div className="card p-0 overflow-hidden min-h-[500px] flex flex-col">
+                                <div className="p-6 border-b border-border flex justify-between items-center">
+                                    <h3 className="text-sm font-bold uppercase tracking-widest">Recent Activity</h3>
+                                    <button onClick={fetchAnalytics} className="p-2 hover:bg-surface rounded-lg opacity-40 hover:opacity-100 transition-all">
+                                        <Activity size={16} />
+                                    </button>
+                                </div>
+                                <div className="grow overflow-y-auto p-4 space-y-2">
+                                    {analytics.history.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
+                                            <BarChart3 size={48} strokeWidth={1} />
+                                            <p className="text-xs font-bold uppercase tracking-widest mt-4">No data yet</p>
+                                        </div>
+                                    ) : (
+                                        [...analytics.history].reverse().map((h, i) => (
+                                            <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-surface transition-all text-xs">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center 
+                                                        ${h.direction === 'received' ? 'bg-accent-success/10 text-accent-success' : 'bg-foreground/5 opacity-60'}`}>
+                                                        {h.direction === 'received' ? <Monitor size={14} /> : <Smartphone size={14} />}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold">{h.filename}</div>
+                                                        <div className="opacity-40 text-[10px] font-mono mt-0.5">{h.device} • {new Date(h.timestamp * 1000).toLocaleTimeString()}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="font-mono opacity-60">{(h.size / (1024 * 1024)).toFixed(2)} MB</div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
             </main>
 
             {/* --- Settings Modal --- */}
@@ -282,10 +412,30 @@ function App() {
                                 <Info size={16} className="text-accent-warning shrink-0" />
                                 <p className="text-[10px] text-accent-warning font-bold leading-tight uppercase tracking-wider">Note: Changing the path will not move existing files.</p>
                             </div>
+
+                            <div className="space-y-4 pt-4 border-t border-border">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <ShieldCheck size={16} className="text-accent-success" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Safety Filter</span>
+                                        </div>
+                                        <p className="text-[10px] opacity-40 font-medium">Block dangerous extensions (.exe, .sh, .bat)</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setSafetyFilter(!safetyFilter)}
+                                        className={`w-12 h-6 rounded-full relative transition-all duration-300 border-2
+                                        ${safetyFilter ? 'bg-accent-success border-accent-success' : 'bg-surface border-border'}`}
+                                    >
+                                        <div className={`absolute top-1 w-3 h-3 rounded-full bg-background transition-all duration-300
+                                            ${safetyFilter ? 'left-7' : 'left-1'}`}></div>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="flex gap-4 pt-4 border-t border-border">
-                            <button onClick={updateSavePath} className="btn-primary flex-1 py-4 text-xs tracking-widest">
+                            <button onClick={updateConfig} className="btn-primary flex-1 py-4 text-xs tracking-widest">
                                 SAVE CONFIGURATION
                             </button>
                             <button onClick={() => setShowSettings(false)} className="btn-secondary px-8 py-4 text-xs tracking-widest">

@@ -1,9 +1,5 @@
-import os
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import FileResponse
-from services.file_service import FileService
-from services.session_manager import session_manager
-from core.config import UPLOAD_DIR
+from services.analytics_service import AnalyticsService
+from services.thumbnail_service import ThumbnailService
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -37,17 +33,59 @@ async def upload(request: Request):
 
 @router.get("/config")
 async def get_config():
-    return {"save_path": FileService.SAVE_PATH}
+    return {
+        "save_path": FileService.SAVE_PATH,
+        "safety_filter": FileService.SAFETY_FILTER_ENABLED,
+    }
 
 
 @router.post("/config")
 async def update_config(request: Request):
     data = await request.json()
     path = data.get("save_path")
-    if not path:
-        raise HTTPException(status_code=400, detail="save_path is required")
-    FileService.set_save_path(path)
-    return {"status": "success", "save_path": FileService.SAVE_PATH}
+    safety = data.get("safety_filter")
+
+    if path:
+        FileService.set_save_path(path)
+    if safety is not None:
+        FileService.SAFETY_FILTER_ENABLED = safety
+
+    return {
+        "status": "success",
+        "save_path": FileService.SAVE_PATH,
+        "safety_filter": FileService.SAFETY_FILTER_ENABLED,
+    }
+
+
+@router.get("/thumbnail/{filename:path}")
+async def get_thumbnail(filename: str):
+    # Try to find the thumbnail
+    # Filename here might be "DeviceName/file.jpg"
+    # We need to find the actual file to get its thumbnail path
+    search_paths = [
+        os.path.join(FileService.SAVE_PATH, filename),
+        os.path.join(UPLOAD_DIR, filename),
+    ]
+    # Also check if it's a session-specific file
+    # This is a bit tricky without session_id, but thumbnails are cached by basename mostly
+    # Actually ThumbnailService.get_thumbnail_path just needs a unique name or full path.
+    # Our implementation uses basename which might collide, let's refine later if needed.
+
+    for path in search_paths:
+        if os.path.exists(path):
+            thumb_path = ThumbnailService.get_thumbnail_path(path)
+            if os.path.exists(thumb_path):
+                return FileResponse(thumb_path)
+
+    raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+
+@router.get("/analytics/history")
+async def get_analytics():
+    return {
+        "history": AnalyticsService.get_history(),
+        "stats": AnalyticsService.get_stats(),
+    }
 
 
 @router.get("/download/{filename:path}")
@@ -55,26 +93,25 @@ async def download(filename: str, request: Request):
     session_id = request.headers.get("x-session-id")
     is_host = request.headers.get("x-is-host") == "true"
 
-    # Search Logic:
-    # 1. If Host: Likely downloading 'received' files from SAVE_PATH.
-    # 2. If Mobile: Likely downloading 'sent' files from UPLOAD_DIR/{session}/outgoing.
-
     search_paths = []
 
-    # Check Project UPLOAD_DIR (Sent/Temp)
     if session_id and session_id != "null":
-        # Sent to this device
         search_paths.append(os.path.join(UPLOAD_DIR, session_id, "outgoing", filename))
 
-    # Check Global UPLOAD_DIR (legacy or root)
     search_paths.append(os.path.join(UPLOAD_DIR, filename))
-
-    # Check SAVE_PATH (Incoming/Permanent)
-    # Host might be requesting "DeviceName/file.jpg"
     search_paths.append(os.path.join(FileService.SAVE_PATH, filename))
 
     for path in search_paths:
-        if os.path.exists(path) and os.path.isfile(path):
-            return FileResponse(path, filename=os.path.basename(path))
+        if os.path.exists(path):
+            if os.path.isfile(path):
+                return FileResponse(path, filename=os.path.basename(path))
+            elif os.path.isdir(path):
+                # Zip it!
+                zip_path = await FileService.zip_directory(path)
+                return FileResponse(
+                    zip_path,
+                    filename=f"{os.path.basename(path)}.zip",
+                    media_type="application/zip",
+                )
 
     raise HTTPException(status_code=404, detail="File not found")

@@ -172,13 +172,27 @@ export function SessionDashboard({ sessionId, deviceName, onBack }: SessionDashb
                                 filteredFiles.map((file) => (
                                     <div key={file.name} className="group p-4 rounded-lg border border-border hover:bg-surface transition-all flex items-center justify-between">
                                         <div className="flex items-center gap-4 overflow-hidden">
-                                            <div className="w-10 h-10 bg-surface border border-border rounded-lg flex items-center justify-center text-foreground/70 font-bold text-[10px] uppercase">
-                                                {file.name.split('.').pop()}
+                                            <div className="w-12 h-12 bg-surface border border-border rounded-lg flex items-center justify-center text-foreground/70 font-bold text-[10px] uppercase shrink-0 overflow-hidden relative">
+                                                {file.is_dir ? (
+                                                    <HardDrive size={24} className="opacity-40" />
+                                                ) : file.has_thumbnail ? (
+                                                    <img
+                                                        src={`/api/files/thumbnail/${activeTab === 'received' ? encodeURIComponent(`${deviceName}/${file.name}`) : encodeURIComponent(file.name)}`}
+                                                        className="w-full h-full object-cover animate-fade-in"
+                                                        alt=""
+                                                    />
+                                                ) : (
+                                                    file.name.split('.').pop()
+                                                )}
+                                                {file.is_dir && <div className="absolute inset-0 bg-accent-success/5"></div>}
                                             </div>
                                             <div className="min-w-0">
-                                                <div className="font-bold truncate text-sm md:text-base">{file.name}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="font-bold truncate text-sm md:text-base">{file.name}</div>
+                                                    {file.is_dir && <span className="text-[8px] bg-accent-success/10 text-accent-success border border-accent-success/20 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Folder</span>}
+                                                </div>
                                                 <div className="flex items-center gap-2 text-xs opacity-50 font-mono mt-0.5">
-                                                    <span>{formatSize(file.size)}</span>
+                                                    <span>{file.is_dir ? 'DIR' : formatSize(file.size)}</span>
                                                     <span>•</span>
                                                     <span>{new Date(file.modified * 1000).toLocaleTimeString()}</span>
                                                 </div>
