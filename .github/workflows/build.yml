@@ -48,6 +48,7 @@ jobs:
 
       - name: Bundle with PyInstaller
         working-directory: ./backend
+        shell: bash
         run: |
           pyinstaller --onefile --noconfirm --clean \
             --add-data "static_app${{ matrix.os == 'windows-latest' && ';' || ':' }}static_app" \
