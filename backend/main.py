@@ -12,15 +12,16 @@ from qr_gen import generate_qr_code_buffer, get_primary_ip
 from mdns_gen import start_mdns, stop_mdns
 
 from contextlib import asynccontextmanager
+import webbrowser
 
 # Constants
 CHUNK_SIZE = 1024 * 1024  # 1MB buffer
 UPLOAD_DIR = "uploads"
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "dist")
 
 # Handle PyInstaller _MEIPASS
 if hasattr(sys, "_MEIPASS"):
-    STATIC_DIR = os.path.join(sys._MEIPASS, "static")
+    STATIC_DIR = os.path.join(sys._MEIPASS, "dist")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -35,6 +36,16 @@ async def lifespan(app: FastAPI):
     mdns_service = await start_mdns(8000)
     # Background watchdog loop
     watchdog_task = asyncio.create_task(watchdog_loop())
+
+    # Auto-open browser (Native only)
+    if not os.path.exists("/.dockerenv"):
+
+        async def open_browser():
+            await asyncio.sleep(1.5)
+            # Use https as that is what we started uvicorn with
+            webbrowser.open("https://127.0.0.1:8000")
+
+        asyncio.create_task(open_browser())
 
     yield
 
