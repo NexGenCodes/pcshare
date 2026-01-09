@@ -3,6 +3,7 @@ version: '3.8'
 services:
   backend:
     build: ./backend
+    restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -12,9 +13,12 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+    networks:
+      - pc-share-network
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -24,3 +28,9 @@ services:
       - VITE_API_URL=https://localhost:8000
     depends_on:
       - backend
+    networks:
+      - pc-share-network
+
+networks:
+  pc-share-network:
+    driver: bridge
