@@ -14,5 +14,5 @@ COPY . .
 
 EXPOSE 8000
 
-# Run with reload for development
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--ssl-keyfile", "key.pem", "--ssl-certfile", "cert.pem", "--reload"]
+# Run main.py as a script to ensure SSL certs are generated before uvicorn starts
+CMD ["python", "main.py"]

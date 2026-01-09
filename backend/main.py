@@ -31,7 +31,6 @@ mdns_service = None
 @app.on_event("startup")
 async def startup_event():
     global mdns_service
-    generate_self_signed_cert()
     mdns_service = start_mdns(8000)
     # Background watchdog loop
     asyncio.create_task(watchdog_loop())
@@ -142,6 +141,9 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
+
+    # Ensure certs are generated BEFORE uvicorn starts
+    generate_self_signed_cert()
 
     uvicorn.run(
         "main:app",
