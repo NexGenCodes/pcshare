@@ -12,45 +12,25 @@ interface HandshakeUIProps {
 const DesktopHandshake = ({ session }: { session: SessionState }) => {
     if (session.status === 'IDLE') {
         return (
-            <div className="flex flex-col items-center justify-center p-8 relative min-h-[80vh]">
-                <div className="card text-center max-w-[560px] w-full relative overflow-hidden">
-                    <div className="flex flex-col items-center gap-4 mb-8">
-                        <div>
-                            <h1 className="text-6xl font-black tracking-tighter m-0">TURBO<span className="opacity-40">SYNC</span></h1>
-                            <div className="inline-block mt-4 px-4 py-1.5 bg-surface rounded-full border border-border">
-                                <p className="opacity-60 font-bold uppercase text-[10px] tracking-[0.3em]">SECURE LOCAL TUNNEL</p>
-                            </div>
-                        </div>
+            <div className="flex flex-col items-center justify-center p-8">
+                <div className="relative group">
+                    <div className="relative bg-white p-6 rounded-[32px] inline-block shadow-2xl group-hover:scale-[1.02] transition-transform duration-500 border-2 border-border">
+                        <img
+                            src="/api/session/qr"
+                            alt="Pairing QR"
+                            className="w-[280px] h-[280px] block"
+                            onError={(e) => {
+                                const ip = window.location.hostname;
+                                (e.target as HTMLImageElement).src = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=https://${ip}:8000?id=session&start=1`;
+                            }}
+                        />
                     </div>
-
-                    <div className="relative group mb-8">
-                        <div className="relative bg-white p-4 rounded-[32px] inline-block shadow-xl group-hover:scale-[1.03] transition-transform duration-500 border border-border">
-                            <img
-                                src="/api/session/qr"
-                                alt="Secure Handshake QR"
-                                className="w-[240px] h-[240px] block"
-                                onError={(e) => {
-                                    const ip = window.location.hostname;
-                                    (e.target as HTMLImageElement).src = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=https://${ip}:8000?id=session&start=1`;
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-6">
-                        <div className="inline-flex items-center justify-center gap-4 bg-surface py-3 px-8 rounded-full border border-border">
-                            <div className="w-3 h-3 rounded-full bg-accent-success animate-pulse"></div>
-                            <span className="opacity-60 text-xs font-black tracking-[0.2em] uppercase">Ready to pair</span>
-                        </div>
-                        <p className="text-sm opacity-40 max-w-[340px] mx-auto leading-relaxed font-medium">Scan the code to establish an encrypted local link instantly.</p>
+                    {/* Floating Pulse */}
+                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-foreground text-background py-2 px-6 rounded-full border border-border shadow-xl">
+                        <div className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></div>
+                        <span className="text-[10px] font-black tracking-[0.2em] uppercase">Ready to Pair</span>
                     </div>
                 </div>
-
-                <footer className="mt-6 bg-surface border border-border px-6 py-2 rounded-full">
-                    <p className="opacity-40 text-[10px] font-black uppercase tracking-[0.2em]">
-                        v2.8 • NODE.{window.location.hostname}
-                    </p>
-                </footer>
             </div>
         );
     }

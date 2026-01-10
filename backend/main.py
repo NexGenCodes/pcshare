@@ -12,7 +12,7 @@ from core.config import STATIC_DIR
 from services.file_service import FileService
 from services.mdns_service import MDNSService  # I will create this next
 from ssl_gen import generate_self_signed_cert
-from api import session_routes, file_routes
+from api import session_routes, file_routes, host_routes
 
 
 @asynccontextmanager
@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI):
     # Startup
     mdns = MDNSService()
     await mdns.start(8000)
+    FileService.start_sync_watcher()
     watchdog_task = asyncio.create_task(FileService.watchdog_loop())
 
     if not os.path.exists("/.dockerenv") and os.environ.get("VITE_DEV") != "true":
@@ -42,6 +43,7 @@ app.router.lifespan_context = lifespan
 # Include Routers
 app.include_router(session_routes.router)
 app.include_router(file_routes.router)
+app.include_router(host_routes.router)
 
 # Static Files
 if os.path.exists(STATIC_DIR):

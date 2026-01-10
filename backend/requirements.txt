@@ -6,3 +6,4 @@ python-multipart
 aiofiles
 zeroconf
 qrcode[pil]
+watchdog
